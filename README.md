@@ -1,4 +1,27 @@
-- 👋 Hi, I’m @NeedlessPage819
-- 👀 I’m interested in python
-- 🌱 I’m currently learning Node js
-- 📫 How to reach me Discord: .needlesspage819
+### 👋 Hey, I'm NeedlessPage819!
+
+🚀 **Developer & AI Enthusiast**  
+💻 **Python Addict** | Former AI Aimbot Dev (Astralock)
+
+---
+
+### 🧠 About Me
+- 🔥 Passionate about coding, especially in Python.
+- 🤖 Developed **Astralock**, an AI aimbot project.
+- ❌ Not learning Node.js (turns out it's not for me 😅).
+- 🎯 Always exploring new technologies and coding challenges.
+
+---
+
+### 🔧 Tech Stack
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)  
+![C++](https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)  
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)  
+
+---
+
+### 📫 Connect With Me
+[![Discord](https://img.shields.io/badge/Discord-.needlesspage819-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/)  
+
+🔥 **Let's talk about AI, coding, or just cool tech stuff!**
