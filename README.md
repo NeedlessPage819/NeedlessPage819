@@ -8,7 +8,6 @@
 ### 🧠 About Me
 - 🔥 Passionate about coding, especially in Python.
 - 🤖 Developed **Astralock**, an AI aimbot project.
-- ❌ Not learning Node.js (turns out it's not for me 😅).
 - 🎯 Always exploring new technologies and coding challenges.
 
 ---
