@@ -22,5 +22,3 @@
 
 ### 📫 Connect With Me
 [![Discord](https://img.shields.io/badge/Discord-.needlesspage819-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/)  
-
-🔥 **Let's talk about AI, coding, or just cool tech stuff!**
