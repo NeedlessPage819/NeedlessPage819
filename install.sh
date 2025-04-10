@@ -35,12 +35,31 @@ else
   echo "  - dtoverlay=dwc2 already in config.txt"
 fi
 
-# Configure cmdline.txt for USB modules
-if ! grep -q "modules-load=dwc2,g_hid" /boot/cmdline.txt; then
-  sed -i 's/rootwait/rootwait modules-load=dwc2,g_hid/' /boot/cmdline.txt
-  echo "  - Added modules-load=dwc2,g_hid to cmdline.txt"
+# Configure modules for USB gadget
+echo "  - Setting up kernel modules for USB gadget mode"
+if ! grep -q "dwc2" /etc/modules; then
+  echo "dwc2" >> /etc/modules
+  echo "  - Added dwc2 to /etc/modules"
 else
-  echo "  - modules-load already in cmdline.txt"
+  echo "  - dwc2 already in /etc/modules"
+fi
+
+if ! grep -q "libcomposite" /etc/modules; then
+  echo "libcomposite" >> /etc/modules
+  echo "  - Added libcomposite to /etc/modules" 
+else
+  echo "  - libcomposite already in /etc/modules"
+fi
+
+# Remove g_hid from cmdline.txt if present (we'll use configfs instead)
+if grep -q "modules-load=dwc2,g_hid" /boot/cmdline.txt; then
+  sed -i 's/modules-load=dwc2,g_hid/modules-load=dwc2/' /boot/cmdline.txt
+  echo "  - Updated cmdline.txt to use dwc2 without g_hid"
+elif ! grep -q "modules-load=dwc2" /boot/cmdline.txt; then
+  sed -i 's/rootwait/rootwait modules-load=dwc2/' /boot/cmdline.txt
+  echo "  - Added modules-load=dwc2 to cmdline.txt"
+else
+  echo "  - cmdline.txt already configured correctly"
 fi
 
 echo "[2/5] Installing required packages..."
@@ -52,34 +71,77 @@ echo "[3/5] Creating HID gadget setup script..."
 # Create HID setup script
 cat > /usr/local/bin/hid_setup.sh << 'EOF'
 #!/bin/bash
+# ZeroPassThrough USB HID Gadget Setup
+
+echo "Setting up USB HID gadget..."
+
+# Make sure configfs is mounted
+if [ ! -d /sys/kernel/config/usb_gadget ]; then
+    echo "Mounting configfs..."
+    mount -t configfs none /sys/kernel/config
+fi
 
 cd /sys/kernel/config/usb_gadget/
 mkdir -p hidg && cd hidg
 
+# Clean up any existing configuration
+if [ -d "configs/c.1" ]; then
+    # Remove existing function links
+    ls configs/c.1/ | grep -v strings | xargs -I {} rm -f configs/c.1/{}
+    
+    # Try to unbind from UDC if currently bound
+    if [ -s "UDC" ]; then
+        echo "" > UDC
+    fi
+fi
+
+# USB device identifiers
 echo 0x1d6b > idVendor    # Linux Foundation
 echo 0x0104 > idProduct   # Mouse device
+echo 0x0100 > bcdDevice   # v1.0.0
+echo 0x0200 > bcdUSB      # USB2
 
+# Device information
 mkdir -p strings/0x409
-echo "ZeroPassThrough" > strings/0x409/serialnumber
-echo "Raspberry Pi" > strings/0x409/manufacturer
+echo "fedcba9876543210" > strings/0x409/serialnumber
+echo "ZeroPassThrough" > strings/0x409/manufacturer
 echo "Pi Zero HID Mouse" > strings/0x409/product
 
-mkdir -p configs/c.1
+# Configuration
 mkdir -p configs/c.1/strings/0x409
 echo "HID Mouse Configuration" > configs/c.1/strings/0x409/configuration
+echo 250 > configs/c.1/MaxPower
 
+# Create HID function
 mkdir -p functions/hid.usb0
-echo 1 > functions/hid.usb0/protocol
-echo 2 > functions/hid.usb0/subclass
-echo -ne \
-  "\x05\x01\x09\x02\xa1\x01\x09\x01\xa1\x00\x05\x09\x19\x01\x29\x03\x15\x00\x25\x01\x95\x03\x75\x01\x81\x02"\
-  "\x95\x01\x75\x05\x81\x03\x05\x01\x09\x30\x09\x31\x09\x38\x15\x81\x25\x7f\x75\x08\x95\x03\x81\x06\xc0\xc0" \
-  > functions/hid.usb0/report_desc
+echo 1 > functions/hid.usb0/protocol   # Mouse
+echo 1 > functions/hid.usb0/subclass   # Boot Interface
 echo 8 > functions/hid.usb0/report_length
 
-ln -s functions/hid.usb0 configs/c.1/
+# Mouse HID descriptor: 3-button mouse with X, Y and wheel
+echo -ne \\x05\\x01\\x09\\x02\\xa1\\x01\\x09\\x01\\xa1\\x00\\x05\\x09\\x19\\x01\\x29\\x05\\x15\\x00\\x25\\x01\\x95\\x05\\x75\\x01\\x81\\x02\\x95\\x01\\x75\\x03\\x81\\x01\\x05\\x01\\x09\\x30\\x09\\x31\\x15\\x81\\x25\\x7f\\x75\\x08\\x95\\x02\\x81\\x06\\xc0\\xc0 > functions/hid.usb0/report_desc
 
-ls /sys/class/udc > UDC
+# Link the HID function to the configuration
+ln -sf functions/hid.usb0 configs/c.1/
+
+# Enable the gadget by binding to UDC
+# Find first UDC driver (usually "20980000.usb" on Pi Zero)
+UDC=$(ls /sys/class/udc | head -n 1)
+if [ -n "$UDC" ]; then
+    echo "Binding USB gadget to UDC: $UDC"
+    echo "$UDC" > UDC
+    echo "USB HID gadget enabled successfully"
+else
+    echo "ERROR: No UDC driver found. USB gadget not enabled."
+    exit 1
+fi
+
+# Verify HID device creation
+if [ -e /dev/hidg0 ]; then
+    echo "HID device /dev/hidg0 created successfully"
+else
+    echo "WARNING: HID device /dev/hidg0 not created. Check dmesg for errors."
+fi
 EOF
 
 chmod +x /usr/local/bin/hid_setup.sh
@@ -138,11 +200,36 @@ class MousePassthrough:
         mouse_path = self.find_mouse()
         if not mouse_path:
             print("No mouse device found. Please connect a USB mouse.")
-            return False
+            print("Waiting for mouse to be connected...")
+            # Wait for a mouse to be connected
+            for attempt in range(10):  # Try for about 10 seconds
+                time.sleep(1)
+                mouse_path = self.find_mouse()
+                if mouse_path:
+                    print(f"Mouse found at {mouse_path}")
+                    break
+            if not mouse_path:
+                print("No mouse detected after waiting. Please connect a USB mouse and restart the service.")
+                return False
         
         try:
             self.mouse_input = InputDevice(mouse_path)
+            
+            # Check if HID device exists
+            if not os.path.exists('/dev/hidg0'):
+                print("ERROR: HID gadget device (/dev/hidg0) not found.")
+                print("USB gadget mode may not be properly configured.")
+                print("Try running 'sudo /usr/local/bin/hid_setup.sh' manually.")
+                return False
+            
+            # Check permissions on HID device
+            if not os.access('/dev/hidg0', os.W_OK):
+                print("ERROR: Cannot write to /dev/hidg0 (permission denied).")
+                print("Make sure this script is running as root.")
+                return False
+                
             self.hid_output = open('/dev/hidg0', 'wb+')
+            print(f"Successfully opened HID device for writing")
             return True
         except PermissionError:
             print("Permission denied accessing devices. Try running with sudo.")
@@ -308,6 +395,18 @@ class MousePassthrough:
         print("ZeroPassThrough running. Press Ctrl+C to exit.")
         
         try:
+            # Test mouse movement
+            print("Testing mouse movement...")
+            self.report[1] = 5  # Move right
+            self.send_report()
+            time.sleep(0.1)
+            self.report[1] = -5  # Move left
+            self.send_report()
+            time.sleep(0.1)
+            self.reset_report()
+            self.send_report()
+            print("Test complete. Ready for input.")
+            
             while self.running:
                 # Handle socket commands if enabled
                 if CONFIG['socket_enabled']:
@@ -354,29 +453,49 @@ cat > /etc/systemd/system/zeropassthrough.service << 'EOF'
 [Unit]
 Description=ZeroPassThrough USB Mouse Passthrough
 After=network.target
+After=systemd-user-sessions.service
 
 [Service]
-ExecStart=/bin/bash -c '/usr/local/bin/hid_setup.sh && /usr/local/bin/mouse_passthrough.py'
-Restart=always
+Type=simple
+ExecStartPre=/usr/local/bin/hid_setup.sh
+ExecStart=/usr/local/bin/mouse_passthrough.py
+Restart=on-failure
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
+# Set proper permissions
+chmod 644 /etc/systemd/system/zeropassthrough.service
+
 # Enable and start the service
+echo "Enabling ZeroPassThrough service to start on boot..."
 systemctl enable zeropassthrough.service
+
+echo "Starting ZeroPassThrough service..."
 systemctl start zeropassthrough.service
+systemctl status zeropassthrough.service --no-pager
 
 echo ""
 echo "===== ZeroPassThrough setup complete! ====="
 echo ""
 echo "The system will automatically start the mouse passthrough service after reboot."
-echo "To test the service now, connect a USB mouse and plug the Pi into a computer."
+echo "To test the service now, connect a USB mouse and plug the Pi into a computer using the USB DATA port."
 echo ""
-echo "For troubleshooting, check the service status with:"
-echo "  sudo systemctl status zeropassthrough"
+echo "Important Notes:"
+echo "  - Use the USB port labeled 'USB' (not 'PWR') to connect to your computer"
+echo "  - A reboot is strongly recommended to ensure all changes take effect:"
+echo "      sudo reboot"
 echo ""
-echo "A reboot is recommended to apply all changes:"
-echo "  sudo reboot"
+echo "Troubleshooting commands:"
+echo "  - Check service status:     sudo systemctl status zeropassthrough"
+echo "  - View logs:                sudo journalctl -u zeropassthrough"
+echo "  - Restart service:          sudo systemctl restart zeropassthrough"
+echo "  - Test USB gadget setup:    sudo /usr/local/bin/hid_setup.sh"
+echo "  - Verify HID device:        ls -l /dev/hidg*"
+echo ""
+echo "===== Happy hacking with ZeroPassThrough! ====="
 echo "" 
