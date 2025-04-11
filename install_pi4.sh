@@ -24,7 +24,7 @@ fi
 
 echo "Installing required packages..."
 apt-get update
-apt-get install -y python3-pip python3-dev git build-essential libudev-dev
+apt-get install -y python3-pip python3-dev git build-essential libudev-dev python3-evdev
 
 echo "Setting up USB gadget mode..."
 # Enable dwc3 module for Pi 4
@@ -47,6 +47,15 @@ cat > /usr/bin/zeropass-setup.sh << 'EOF'
 # Make sure configfs is mounted
 if [ ! -d /sys/kernel/config/usb_gadget ]; then
     mount -t configfs none /sys/kernel/config
+fi
+
+# Remove existing gadget if it exists
+if [ -d /sys/kernel/config/usb_gadget/zeropassthrough ]; then
+    echo "Removing existing gadget..."
+    cd /sys/kernel/config/usb_gadget/zeropassthrough
+    echo "" > UDC
+    cd ..
+    rmdir zeropassthrough
 fi
 
 cd /sys/kernel/config/usb_gadget/
@@ -90,6 +99,8 @@ if [ ! -z "$UDC" ]; then
     echo "USB gadget enabled with UDC: $UDC"
 else
     echo "ERROR: No UDC driver found. USB gadget not enabled."
+    echo "Available UDC drivers:"
+    ls /sys/class/udc
     exit 1
 fi
 EOF
@@ -107,6 +118,13 @@ import sys
 import evdev
 from evdev import ecodes
 
+# Enable debug logging
+DEBUG = True
+
+def debug(msg):
+    if DEBUG:
+        print(f"[DEBUG] {msg}")
+
 # Check for permissions
 if not os.access('/dev/hidg0', os.W_OK):
     print("Error: Cannot access /dev/hidg0. Make sure this script runs as root.")
@@ -118,13 +136,22 @@ def write_report(report):
             fd.write(report)
     except Exception as e:
         print(f"Error writing to HID device: {e}")
+        debug(f"Report content: {report}")
 
 def find_mouse():
-    devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
-    for device in devices:
-        if ecodes.EV_REL in device.capabilities():
-            return device.path
-    return None
+    try:
+        devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
+        debug(f"Found input devices: {[d.name for d in devices]}")
+        for device in devices:
+            debug(f"Checking device: {device.name}")
+            debug(f"Capabilities: {device.capabilities()}")
+            if ecodes.EV_REL in device.capabilities():
+                debug(f"Found mouse device: {device.name}")
+                return device.path
+        return None
+    except Exception as e:
+        print(f"Error finding mouse: {e}")
+        return None
 
 def main():
     print("ZeroPassThrough service started")
@@ -135,6 +162,7 @@ def main():
     mouse_path = find_mouse()
     if not mouse_path:
         print("Error: No mouse device found")
+        print("Please connect a mouse and try again")
         sys.exit(1)
     
     print(f"Found mouse at {mouse_path}")
@@ -156,30 +184,34 @@ def main():
     
     # Main event loop
     button_state = 0
-    for event in mouse.read_loop():
-        if event.type == ecodes.EV_REL:
-            if event.code == ecodes.REL_X:
-                write_report(struct.pack('<BBB', button_state, event.value, 0))
-            elif event.code == ecodes.REL_Y:
-                write_report(struct.pack('<BBB', button_state, 0, event.value))
-        elif event.type == ecodes.EV_KEY:
-            if event.code in [ecodes.BTN_LEFT, ecodes.BTN_RIGHT, ecodes.BTN_MIDDLE]:
-                if event.code == ecodes.BTN_LEFT:
-                    if event.value == 1:
-                        button_state |= 1
-                    else:
-                        button_state &= ~1
-                elif event.code == ecodes.BTN_RIGHT:
-                    if event.value == 1:
-                        button_state |= 2
-                    else:
-                        button_state &= ~2
-                elif event.code == ecodes.BTN_MIDDLE:
-                    if event.value == 1:
-                        button_state |= 4
-                    else:
-                        button_state &= ~4
-                write_report(struct.pack('<BBB', button_state, 0, 0))
+    try:
+        for event in mouse.read_loop():
+            if event.type == ecodes.EV_REL:
+                if event.code == ecodes.REL_X:
+                    write_report(struct.pack('<BBB', button_state, event.value, 0))
+                elif event.code == ecodes.REL_Y:
+                    write_report(struct.pack('<BBB', button_state, 0, event.value))
+            elif event.type == ecodes.EV_KEY:
+                if event.code in [ecodes.BTN_LEFT, ecodes.BTN_RIGHT, ecodes.BTN_MIDDLE]:
+                    if event.code == ecodes.BTN_LEFT:
+                        if event.value == 1:
+                            button_state |= 1
+                        else:
+                            button_state &= ~1
+                    elif event.code == ecodes.BTN_RIGHT:
+                        if event.value == 1:
+                            button_state |= 2
+                        else:
+                            button_state &= ~2
+                    elif event.code == ecodes.BTN_MIDDLE:
+                        if event.value == 1:
+                            button_state |= 4
+                        else:
+                            button_state &= ~4
+                    write_report(struct.pack('<BBB', button_state, 0, 0))
+    except Exception as e:
+        print(f"Error in main loop: {e}")
+        raise
 
 if __name__ == "__main__":
     try:
@@ -209,6 +241,7 @@ Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
@@ -223,6 +256,9 @@ systemctl enable zeropassthrough.service
 
 echo "Starting service..."
 systemctl start zeropassthrough.service
+
+# Wait a moment and check status
+sleep 2
 systemctl status zeropassthrough.service --no-pager
 
 echo "====================================="
@@ -233,4 +269,4 @@ echo "The Pi should appear as a mouse device."
 echo "======================================"
 echo "To check service status: sudo systemctl status zeropassthrough"
 echo "To view logs: sudo journalctl -u zeropassthrough"
-echo "======================================" 
+echo "======================================"
