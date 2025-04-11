@@ -27,19 +27,23 @@ apt-get update
 apt-get install -y python3-pip python3-dev git build-essential libudev-dev python3-evdev
 
 echo "Setting up USB gadget mode..."
-# Enable dwc3 module for Pi 4
-if ! grep -q "dtoverlay=dwc3" /boot/config.txt; then
-    echo "dtoverlay=dwc3" >> /boot/config.txt
+# Enable dwc2 module for Pi 4 (using OTG port)
+if ! grep -q "dtoverlay=dwc2" /boot/config.txt; then
+    echo "dtoverlay=dwc2" >> /boot/config.txt
 fi
 
 # Add modules to /etc/modules
-if ! grep -q "dwc3" /etc/modules; then
-    echo "dwc3" >> /etc/modules
+if ! grep -q "dwc2" /etc/modules; then
+    echo "dwc2" >> /etc/modules
 fi
 
 if ! grep -q "libcomposite" /etc/modules; then
     echo "libcomposite" >> /etc/modules
 fi
+
+# Load required modules
+modprobe libcomposite
+modprobe dwc2
 
 # Create HID setup script
 cat > /usr/bin/zeropass-setup.sh << 'EOF'
@@ -92,7 +96,7 @@ echo -ne \\x05\\x01\\x09\\x02\\xa1\\x01\\x09\\x01\\xa1\\x00\\x05\\x09\\x19\\x01\
 ln -sf functions/hid.usb0 configs/c.1/
 
 # Enable the gadget by binding to UDC
-# Find first UDC driver (should be "fe980000.usb" on Pi 4)
+# Find first UDC driver (should be "20980000.usb" on Pi 4)
 UDC=$(ls /sys/class/udc | head -n 1)
 if [ ! -z "$UDC" ]; then
     echo "$UDC" > UDC
