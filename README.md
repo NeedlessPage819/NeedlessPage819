@@ -8,6 +8,7 @@
 ### 🧠 About Me
 - 🔥 Passionate about coding, especially in Python.
 - 🤖 Developed **Astralock**, an AI aimbot project.
+- (also working on An rocket league tool feel free to check it out! https://dsc.gg/vutrium)
 - 🎯 Always exploring new technologies and coding challenges.
 
 ---
