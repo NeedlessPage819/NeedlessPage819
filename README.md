@@ -25,7 +25,7 @@ former aimbot architect turned serial rocket league tool abandoner. mostly here 
 - questioning life choices but committing anyway
 
 ## find me
-discord: `.needlesspage819`  
+discord: `needlesspage819`  
 status: probably fighting with an api somewhere
 
 ---
