@@ -1,33 +1,29 @@
-# hey i'm needlesspage819
+# hey, i'm needlesspage819
 
-former aimbot architect turned serial rocket league tool abandoner. mostly here because sleep is optional and python makes bad decisions easier to implement.
+systems developer, reverse engineer, and computer vision hobbyist.
 
-## what i've done (graveyard edition)
-- **riftbot** - current rocket league bot project (actually maintained)
-  - join: discord.gg/riftbot
-  - this one's different i swear
-- **vutrium** - rocket league tool (discontinued)
-  - rip to a real one
-  - lived fast, died young, left behind spaghetti code
-- **astralock** - ai aimbot project (retired, undefeated, never coming back)
-  - learned more about opencv than any person should
-  - also learned that cheat detection is very real
+## the project graveyard
 
-## tech stack (aka my comfort zone)
-- python (the duct tape of programming languages)
-- c++ (when python is too slow and i hate myself)
-- linux (because windows updates have betrayed me one too many times)
+### riftbot
+my former rocket league bot project. i no longer maintain this, but it was fun while it lasted.
+- discord: discord.gg/riftbot
+- *no longer my circus, no longer my monkeys.*
+
+### vutrium
+a discontinued rocket league tool designed for telemetry and input automation. lived fast, died young, and left behind a legacy of messy code that i pretend doesn't exist.
+
+### astralock
+a retired computer vision target-tracking project built with opencv and python. taught me a lot about real-time image processing, low-latency input pipelines, and system constraints. retired, shitty code (you wouldn't even believe how shitty it was), and never coming back.
+
+## stuff i use
+
+- python (perfect for prototyping terrible ideas at 3am)
+- c++ (when python is too slow and i want to fight memory leaks)
 
 ## current status
-- actually working on riftbot (for now)
-- debugging stuff that worked yesterday
-- refactoring code i wrote at 3am
-- questioning life choices but committing anyway
+- working on private projects that i will almost certainly never make public.
+- fighting with local builds.
 
 ## find me
-discord: `needlesspage819`  
-status: probably fighting with an api somewhere
-
----
-
-*"it's not abandoned, it's just on an indefinite hiatus"* - me, about every project
+- discord: `needlesspage819`
+- *probably arguing with a driver somewhere*
